@@ -1,0 +1,191 @@
+library(fpp2)
+
+###############ARIMA(1,0,0)(1,0,0) simulation in R
+season = 12
+arcoeff = 0.3
+sarcoeff = 0.6
+periods = 400
+armean = 0
+arseries = array()
+arseries[1] = armean
+whitenoise = rnorm(periods, mean = 0, sd = 1)
+
+#FIRST INITIATE THE SERIES
+for (i in 1:season+1){
+	arseries[i] = whitenoise[i]	#BOOTSTRAP FIRST FEW OBSERVATIONS
+}
+
+#SIMULATION
+for (i in (season+2):periods){
+	arseries[i] = (arseries[i-1]*arcoeff) + (arseries[i-season]*sarcoeff) - ((arcoeff*sarcoeff)*arseries[i-(season+1)]) + whitenoise[i]
+}
+acf((arseries))
+
+
+#WE CAN ALSO USE AN AUTOMATED PACKAGE TO SIMULATE SARIMA
+install.packages("astsa")
+library(astsa)
+
+#SARIMA simulation
+model = sarima.sim(d = 0, D = 0, ar = c(arcoeff), sar=c(sarcoeff), S = season)
+acf(model)
+
+
+###############ARIMA(1,0,1)(1,0,1) simulation in R
+season = 12
+arcoeff = 0.05
+sarcoeff = 0.05
+macoeff = 0.8
+smacoeff = 0.8
+periods = 400
+armean = 0
+arseries = array()
+arseries[1] = armean
+whitenoise = rnorm(periods, mean = 0, sd = 1)
+
+#FIRST INITIATE THE SERIES
+for (i in 1:season+1){
+	arseries[i] = whitenoise[i]	#BOOTSTRAP FIRST FEW OBSERVATIONS
+}
+
+#SIMULATION
+for (i in (season+2):periods){
+	arseries[i] = (arseries[i-1]*arcoeff) + (arseries[i-season]*sarcoeff) - ((arcoeff*sarcoeff)*arseries[i-(season+1)]) + whitenoise[i] + smacoeff*whitenoise[i-season] + macoeff*whitenoise[i-1] + smacoeff*macoeff*whitenoise[i-(season+1)]
+}
+acf((arseries))
+
+
+#WE CAN ALSO USE AN AUTOMATED PACKAGE TO SIMULATE SARIMA
+install.packages("astsa")
+library(astsa)
+
+#SARIMA simulation
+model = sarima.sim(d = 0, D = 0, ar = c(arcoeff), sar=c(sarcoeff), ma = c(macoeff), sma=c(smacoeff), S = season)
+acf(model)
+
+
+##########################ACF and PACF of SEASONAL ARIMA MODELS######################
+acf(sarima.sim(d=0, D=0, ar=c(0), sar=c(0.75), ma = c(0), sma = c(0), S = 12), lag.max = 60)
+pacf(sarima.sim(d=0, D=0, ar=c(0), sar=c(0.75), ma = c(0), sma = c(0), S = 12), lag.max = 60)
+
+acf(sarima.sim(d=0, D=0, ar=c(0), sar=c(0), ma = c(0), sma = c(0.9), S = 12), lag.max = 60)
+pacf(sarima.sim(d=0, D=0, ar=c(0), sar=c(0), ma = c(0), sma = c(0.9), S = 12), lag.max = 60)
+
+acf(sarima.sim(d=0, D=0, ar=c(0.75), sar=c(0.9), ma = c(0), sma = c(0), S = 12), lag.max = 60)
+pacf(sarima.sim(d=0, D=0, ar=c(0.75), sar=c(0.9), ma = c(0), sma = c(0), S = 12), lag.max = 60)
+
+acf(sarima.sim(d=0, D=0, ar=c(0), sar=c(0), ma = c(0.75), sma = c(0.75), S = 12), lag.max = 60)
+pacf(sarima.sim(d=0, D=0, ar=c(0), sar=c(0), ma = c(0.75), sma = c(0.75), S = 12), lag.max = 60)
+
+acf(sarima.sim(d=0, D=1, ar=c(0.75), sar=c(0.75), ma = c(0), sma = c(0), S = 12), lag.max = 60)
+
+acf(sarima.sim(d=1, D=0, ar=c(0.75), sar=c(0), ma = c(0), sma = c(0), S = 12), lag.max = 60)
+pacf(sarima.sim(d=1, D=0, ar=c(0.75), sar=c(0), ma = c(0), sma = c(0), S = 12), lag.max = 60)
+
+
+#################AUTO ARIMA DEMONSTRATION#################################
+library(fpp2)
+autoplot(elec)
+fit = auto.arima(elec)
+fit
+
+tsdisplay(elec)
+nsdiffs(elec)
+ndiffs(diff(elec,12))
+tsdisplay(diff(diff(elec,12)))
+stationary = diff(diff(elec,12))
+acf(stationary)
+pacf(stationary)
+
+model1 = Arima(elec, order=c(0,1,1), seasonal = c(0,1,1))
+model1
+
+model2 = Arima(elec, order = c(0,1,1), seasonal = c(0,1,2))
+model2
+
+autoplot(forecast(model2, h=10), include = 80)
+autoplot(forecast(auto.arima(elec), h=10), include=80)
+
+
+###########DEMONSTRATION OF FORECAST INTERVALS########################
+#AR(1) simulation in R
+periods = 400
+armean = 5
+arcoeff = 0.75
+arseries = array()
+arseries[1] = armean
+whitenoise = rnorm(periods, mean = 0, sd = 1)
+for (i in 2:periods){
+	arseries[i] = (arseries[i-1]*arcoeff) + (armean) + (whitenoise[i])
+
+}
+autoplot(ts(arseries))
+#forecast intervals for stationary AR(1) - NOTE:  DUE TO THE RANDOM NUMBER GENERATOR, YOU MAY NOT ALWAYS GET ARIMA(1,0,0) USING AUTO ARIMA; TRY RUNNING CODE SEGMENT A FEW TIMES
+auto.arima(ts(arseries))
+autoplot(forecast(auto.arima(ts(arseries)),h=10), include=80)
+autoplot(forecast(auto.arima(ts(arseries)),h=100), include=80)
+
+
+#MA(1) simulation in R
+periods = 400
+c = 10
+theta1 = 0.5
+maseries = array()
+whitenoise = rnorm(periods, mean = 0, sd = 1)
+maseries[1] = c + whitenoise[1]
+for (i in 2:periods){
+	maseries[i] = c + whitenoise[i] + theta1*whitenoise[i-1]
+}
+autoplot(ts(maseries))
+#forecast intervals for stationary MA(1) - NOTE:  DUE TO THE RANDOM NUMBER GENERATOR, YOU MAY NOT ALWAYS GET ARIMA(0,0,1) USING AUTO ARIMA; TRY RUNNING CODE SEGMENT A FEW TIMES
+auto.arima(ts(maseries))
+autoplot(forecast(auto.arima(ts(maseries)),h=10), include=80)
+autoplot(forecast(auto.arima(ts(arseries)),h=100), include=80)
+
+#ARIMA(0,1,1) simulation in R
+periods = 400
+c = 1
+theta1 = 0.5
+maseries = array()
+whitenoise = rnorm(periods, mean = 0, sd = 1)
+maseries[1] = c + whitenoise[1]
+for (i in 2:periods){
+	maseries[i] = c + whitenoise[i] + theta1*whitenoise[i-1]
+}
+#"maseries" will be the first difference of our simulated series.  (yt - yt-1) follows ma(1), so yt = yt-1 + ma(1)
+arima011 = array()
+arima011[1] = c + whitenoise[1]
+for (i in 2:periods){
+	arima011[i] = arima011[i-1] + maseries[i]
+}
+autoplot(ts(arima011))
+#forecast intervals for stationary ARIMA(0,1,1) -  - NOTE:  DUE TO THE RANDOM NUMBER GENERATOR, YOU MAY NOT ALWAYS GET ARIMA(0,1,1) USING AUTO ARIMA; TRY RUNNING CODE SEGMENT A FEW TIMES
+auto.arima(ts(arima011))
+autoplot(forecast(auto.arima(ts(arima011)),h=10), include=80)
+autoplot(forecast(auto.arima(ts(arima011)),h=100), include=80)
+
+#ILLUSTRATING CONSTANT WITH ARIMA(0,1,1)
+periods = 400
+c = 1
+theta1 = 0.5
+maseries = array()
+whitenoise = rnorm(periods, mean = 0, sd = 1)
+maseries[1] = c + whitenoise[1]
+for (i in 2:periods){
+	maseries[i] = c + whitenoise[i] + theta1*whitenoise[i-1]
+}
+#"maseries" will be the first difference of our simulated series.  (yt - yt-1) follows ma(1), so yt = yt-1 + ma(1)
+arima011 = array()
+arima011[1] = c + whitenoise[1]
+for (i in 2:periods){
+	arima011[i] = arima011[i-1] + maseries[i]
+}
+tssample = ts(arima011)
+autoplot(tssample)
+#WE KNOW THIS IS ARIMA(0,1,1)
+Arima(tssample, order = c(0,1,1), include.drift=TRUE) #obtain estimate for drift
+Arima(tssample, order = c(0,2,1), include.drift=TRUE) #WILL GET AN ERROR MESSAGE
+Arima(tssample, order = c(0,1,1), include.mean=TRUE) #THIS HAS NO EFFECT.  R WILL NOT INCLUDE A CONSTANT BECAUSE d > 0
+Arima(tssample, order = c(0,0,1), include.mean=TRUE) #obtain estimate for c
+
+

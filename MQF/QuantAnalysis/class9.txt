@@ -1,0 +1,98 @@
+#############LSTM section
+###ONLY DO THIS SECTION IF YOU HAVE NOT INSTALLED TENSORFLOW AND/OR KERAS.  IGNORE OTHERWISE.  EXTREMELY LONG RUN TIME#####################
+install.packages("keras")
+install.packages("tensorflow")
+library(keras)
+library(tensorflow)
+install_keras()
+install_tensorflow(version = "nightly")
+#####END FIRST TIME INSTALL##
+
+library(fpp2)
+library(keras)
+library(tensorflow)
+
+############HELPER FUNCTION ADAPTED FROM https://cran.r-project.org/web/packages/keras/keras.pdf.  BACKUP BEFORE EDITING##################
+#######TAKES IN TS OBJECT AND FORECAST HORIZON, OUTPUTS FORECAST USING LSTM MODEL
+#######FORECAST HORIZON IS IN SAME UNITS AS TS OBJECT. E.G. IF TS OBJECT IS MONTHLY, FORECAST HORIZON=12 MEANS 12 MONTHS
+#######FUNCTION WILL FORECAST LAST X PERIODS OF TIME SERIES [i.e. INSAMPLE FORECAST] WHERE X = FORECASTHORIZON
+#######TO ROLL THE FORECAST INTO FUTURE INDEFINITELY, EDIT LINE X (labelled below)
+lstmforecast = function(yvariable, forecasthorizon){
+    normalization = c(mean(yvariable), sd(yvariable))
+    train_norm = (yvariable - normalization[1]) / normalization[2]
+    train_norm = as.matrix(train_norm)
+    
+    x_train_data = t(sapply(1:(length(train_norm) - forecasthorizon - forecasthorizon + 1), function(x) train_norm[x:(x + forecasthorizon - 1), 1] ))
+    x_train_arr = array(data = as.numeric(unlist(x_train_data)), dim = c( nrow(x_train_data), forecasthorizon,   1   )  )
+    y_train_data = t(sapply( (1 + forecasthorizon):(length(train_norm) - forecasthorizon + 1), function(x) train_norm[x:(x + forecasthorizon - 1)] ))
+    y_train_arr = array( data = as.numeric(unlist(y_train_data)),  dim = c(  nrow(y_train_data),  forecasthorizon,   1    ) )
+    x_test = yvariable[(nrow(train_norm) - 2*forecasthorizon + 1):(nrow(train_norm) - forecasthorizon + 1)]
+    x_test_scaled = (x_test - normalization[1]) / normalization[2]
+    x_pred_arr = array(data = x_test_scaled,  dim = c( 1, forecasthorizon,  1 ) )
+
+    #####LSTM SETTINGS COPY PASTED FROM DOCS WITHOUT MODIFICATION###########
+    lstm_model = keras_model_sequential()
+    lstm_model %>%
+      layer_lstm(units = 50, # size of the layer
+           batch_input_shape = c(1, forecasthorizon, 1), # batch size, timesteps, features
+           return_sequences = TRUE,
+           stateful = TRUE) %>%
+      # fraction of the units to drop for the linear transformation of the inputs
+      layer_dropout(rate = 0.5) %>%
+      layer_lstm(units = 50,
+            return_sequences = TRUE,
+            stateful = TRUE) %>%
+      layer_dropout(rate = 0.5) %>%
+      time_distributed(keras::layer_dense(units = 1))
+    
+    lstm_model %>%compile(loss = 'mae', optimizer = 'adam', metrics = 'accuracy')     
+    lstm_model %>% fit(x = x_train_arr, y = y_train_arr, batch_size = 1, epochs = 20, verbose = 0,  shuffle = FALSE )    
+    lstm_forecast = lstm_model %>% predict(x_pred_arr, batch_size = 1) %>%.[, , 1]  #LINE X
+    lstm_forecast = lstm_forecast * normalization[2] + normalization[1]
+
+    return(lstm_forecast)   
+}
+
+
+
+##EDIT THESE SETTINGS
+var = goog
+forecasthorizon = 24
+
+##DO NOT REALLY NEED TO EDIT THIS PART######
+forecast = lstmforecast(var,forecasthorizon)
+forecastedseries = ts(append(var[1:(length(var)-forecasthorizon)], forecast))
+autoplot(forecastedseries) + autolayer(ts(var))
+
+
+
+##############VECM section######
+install.packages("tsDyn")
+install.packages("urca")
+install.packages("aTSA")
+library(tsDyn)
+library(urca)
+library(vars)
+library(aTSA)
+
+data("zeroyld")
+#learn about the data
+autoplot(ts(zeroyld[[1]])) + autolayer(ts(zeroyld[[2]]))
+?zeroyld
+head(zeroyld)
+
+#demonstration of cointegration test
+coint.test(zeroyld[[1]], zeroyld[[2]])
+
+#determine number of cointegrating relationships
+summary(ca.jo(zeroyld))  #output: r = 1 (see slides for how to interpret)
+
+#determine number of VAR lags
+VARselect(zeroyld)	#output:  lag = 2 using BIC
+
+#build the VECM model using lag = 2 and r = 1
+vecmmodel = VECM(zeroyld, lag = 2, r = 1, estim = "ML")
+vecmmodel #print coefficients
+
+#predictions using VECM model
+predict(vecmmodel, n.ahead = 10)

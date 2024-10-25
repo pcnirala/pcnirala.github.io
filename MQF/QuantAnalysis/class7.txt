@@ -1,0 +1,101 @@
+library(fpp2)
+library(TSstudio)
+library(vars)
+library(lmtest)
+
+
+#####ARIMA exercise 3##########################
+autoplot(austa) 
+auto.arima(austa) 
+checkresiduals(auto.arima(austa)) 
+
+#code for slide 18, 19, 20 deliberately omitted
+
+autoplot(forecast(Arima(austa, order=c(2,1,3), include.drift =TRUE), h=10))    
+autoplot(forecast(Arima(austa, order=c(2,1,3), include.drift = FALSE), h=10))  
+
+
+autoplot(forecast(Arima(austa, order=c(0,0,1), include.constant=TRUE), h=10))  
+autoplot(forecast(Arima(austa, order=c(0,0,0), include.constant=TRUE), h=10))  
+
+
+autoplot(forecast(Arima(austa, order=c(0,2,1), include.constant=FALSE), h=10)) 
+
+
+######COMPLEX SEASONALITY#############
+
+autoplot(calls)
+head(calls) 
+autoplot(mstl(calls))  
+autoplot(forecast(stlf(calls),h=300), include=80) 
+
+
+call_single = msts(ts(calls), seasonal.periods = 845)  #flatten the time series, and then recreate it as MSTS object with only weekly period
+accuracy(stlf(call_single))
+accuracy(stlf(calls))
+
+
+df1 <- read.csv("https://query1.finance.yahoo.com/v7/finance/download/SPY?period1=1013817600&period2=1644969600&interval=1d&events=history&includeAdjustedClose=true")  #daily SPY data
+spyts<-ts(data=df1['Adj.Close'])
+spyts = diff(log(spyts))
+spy_msts1 = msts(spyts, seasonal.periods = c(22,66,252))  #22 trading days in a month, 66 in a quarter and 252 in a year
+
+autoplot(forecast(stlf(spy_msts1, method="arima"), h = 100), include=80) 
+
+
+######VAR#############
+
+head(uschange) 
+
+
+VARselect(uschange[,1:2], lag.max=8)  
+
+
+var1 = VAR(uschange[,1:2], p = 1, type="const") 
+serial.test(var1, lags.pt=10, type="PT.asymptotic")
+var2 <- VAR(uschange[,1:2], p=2, type="const")
+serial.test(var2, lags.pt=10, type="PT.asymptotic")
+var3 <- VAR(uschange[,1:2], p=3, type="const")
+serial.test(var3, lags.pt=10, type="PT.asymptotic")
+
+
+autoplot(forecast(var3, h = 40))
+
+
+outofsampleperiod = 100
+uschange_split = ts_split(uschange, sample.out = outofsampleperiod)
+accuracy(x = uschange_split$test[,1:1], forecast(auto.arima(uschange_split$train[,1:1]),h=outofsampleperiod))
+var3 = VAR(uschange_split$train[,1:2], p = 3, type="const")
+var_fc = forecast(var3, h = outofsampleperiod)
+accuracy(x = uschange_split$test[,1:1], var_fc$forecast$Consumption)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#############answer for class exercise############
+#make stationary:  
+
+
+
