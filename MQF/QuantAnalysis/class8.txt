@@ -1,0 +1,116 @@
+install.packages("e1071")
+library(e1071)
+
+data(iris)
+attach(iris)
+
+
+######PURELY IN SAMPLE EVALUATION ONLY#################
+model = svm(Species ~ ., data = iris)
+print(model)
+summary(model)
+
+# test with train data
+pred = predict(model, x)
+
+# Check accuracy:
+table(pred, y)
+
+
+######OUT OF SAMPLE TEST HERE#########################
+trainingindex = c(1:45,51:95,100:145)  #use 90% of the setosa (index 1 to 45), 90% of versicolor (index 51 to 95) and 90% of virginica (index 100 to 145) observations for training
+iris_train = iris[trainingindex,]   #90% of 150 rows as the training set
+iris_test = iris[-trainingindex,] 	#rest of observations as test set
+
+iris_target_category = iris[trainingindex,5]  #category labels for training
+iris_test_category = iris[-trainingindex,5]  #category labels for testing
+
+model2= svm(iris_target_category ~ ., data = iris_train)
+pred2 = predict(model2, iris_test)
+table(pred2, iris_test_category)
+
+######END OUT OF SAMPLE TEST HERE###################
+
+
+
+############SVM FOR TIME SERIES CLASSIFICATION - GENERATION, TRAINING AND CLASSIFICATION of 400 TS####
+#####SARIMA simulation.  We simulate 4 kinds of time series
+library(astsa)
+
+allfeatures = array()
+features = array()
+numberexamplespergroup = 100;
+
+#first, we simulate 100 ARIMA(2,1,0)(1,0,1) models.  label this as group 1 
+for (i in 1:numberexamplespergroup ){
+	model = sarima.sim(d = 1, D = 0, ar = c(0.7,0.2), sar=c(0.7), sma = c(0.5), S = 12)
+	features = rbind(features, c(feat_pacf(model), feat_spectral(model), coef_hurst(model), feat_acf(model), 1))
+}
+features = features[2:(dim(features)[1]),]
+allfeatures = rbind(allfeatures, features)
+
+
+
+#second, 100 ARIMA(0,0,1)(0,0,0) models.  label this as group 2.  this is just white noise! 
+features = array()
+for (i in 1:numberexamplespergroup ){
+	model = sarima.sim(d = 0, D = 0, ma = c(0.7), S = 12)
+	features = rbind(features, c(feat_pacf(model), feat_spectral(model), coef_hurst(model), feat_acf(model), 2))
+}
+features = features[2:(dim(features)[1]),]
+allfeatures = rbind(allfeatures, features)
+
+
+#third, 100 ARIMA(1,0,1)(0,0,0) models.  label this as group 3.  this is just ARMA(1,1)
+features = array()
+for (i in 1:numberexamplespergroup ){
+	model = sarima.sim(d = 0, D = 0, ma = c(0.7), ar=c(0.7), S = 12)
+	features = rbind(features, c(feat_pacf(model), feat_spectral(model), coef_hurst(model), feat_acf(model), 3))
+}
+features = features[2:(dim(features)[1]),]
+allfeatures = rbind(allfeatures, features)
+
+
+
+
+#last, 100 ARIMA(0,0,1)(1,0,1) models.  label this as group 4
+features = array()
+for (i in 1:numberexamplespergroup ){
+	model = sarima.sim(d = 0, D = 0, ma = c(0.7), sar=c(0.7), sma=(0.5), S = 12)
+	features = rbind(features, c(feat_pacf(model), feat_spectral(model), coef_hurst(model), feat_acf(model), 4))
+}
+features = features[2:(dim(features)[1]),]
+allfeatures = rbind(allfeatures, features)
+
+allfeatures = allfeatures[2:(dim(allfeatures)[1]),]   #this is the training set.  we want to train our SVM to classify a time series into one of four categories:  white noise, ARMA(1,1), ARIMA(0,0,1)(1,0,1) and ARIMA(2,1,0)(1,0,1)
+
+
+trainingindex = c(1:90,101:190,201:290,301:390)  #use 90% of each group for training.  rest for test
+
+model = svm(allfeatures[trainingindex,12] ~ ., data = allfeatures[trainingindex,1:11], type="C")
+print(model)
+summary(model)
+
+
+predictions = predict(model, allfeatures[-trainingindex,1:11])
+table(predictions, allfeatures[-trainingindex,12])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
